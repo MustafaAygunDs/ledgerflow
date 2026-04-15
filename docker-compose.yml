@@ -1,0 +1,114 @@
+version: '3.8'
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://kobi:kobi123@postgres/airflow_db
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'kobi-secret-2024'
+    KOBI_DB_CONN: postgresql+psycopg2://kobi:kobi123@postgres/kobi_db
+    KOBI_DB_HOST: postgres
+    KOBI_DB_PORT: 5432
+    KOBI_DB_NAME: kobi_db
+    KOBI_DB_USER: kobi
+    KOBI_DB_PASS: kobi123
+    SMTP_HOST: smtp.gmail.com
+    SMTP_PORT: 587
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASS: ${SMTP_PASS:-}
+    REPORT_EMAIL: ${REPORT_EMAIL:-}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./scripts:/opt/airflow/scripts
+    - airflow_logs:/opt/airflow/logs
+  depends_on:
+    - postgres
+  networks:
+    - kobi-network
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: kobi-postgres
+    environment:
+      POSTGRES_USER: kobi
+      POSTGRES_PASSWORD: kobi123
+      POSTGRES_DB: kobi_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - kobi_postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_dbs.sh:/docker-entrypoint-initdb.d/init_dbs.sh
+    networks:
+      - kobi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kobi -d kobi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: kobi-metabase
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase_db
+      MB_DB_PORT: 5432
+      MB_DB_USER: kobi
+      MB_DB_PASS: kobi123
+      MB_DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kobi-network
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: kobi-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@kobi.local \
+          --password admin123 || true
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: kobi-airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: kobi-airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+
+volumes:
+  kobi_postgres_data:
+  airflow_logs:
+
+networks:
+  kobi-network:
+    driver: bridge

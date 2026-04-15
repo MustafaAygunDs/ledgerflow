@@ -1,0 +1,26 @@
+# Ortam değişkenleri
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Docker volumes (yerel)
+kobi_postgres_data/
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+
+# Üretilen raporlar
+data/*.html
+data/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
