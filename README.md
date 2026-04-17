@@ -37,11 +37,14 @@ flowchart LR
 3. Airflow sends HTML email reports via SMTP
 
 ### Database Schema
+
+```
 customers (15 records)
 ├── invoices (632 records, 38.7M TRY)
 │       └── payments (406 payments, 23.6M TRY collected)
 └── (views: overdue_receivables, critical_stock)
 inventory (48 items)
+```
 
 ---
 
