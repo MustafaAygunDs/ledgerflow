@@ -199,4 +199,4 @@ REPORT_EMAIL=manager@company.com
 
 MIT
 
-*Mustafa Aygun — Data Engineer*
+*Mustafa Aygun — Data Analyst*
